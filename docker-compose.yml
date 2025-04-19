@@ -1,0 +1,45 @@
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_storage:/app/media
+      - backend_static:/app/staticfiles
+      - backend_data:/app/data
+    environment:
+      - DJANGO_DEBUG=True
+      - DJANGO_SECRET_KEY=7c)o$*0c(-hvq451eeeth4s#485boydro228%7p!^+ac6%sff2
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+      - DATABASE_URL=sqlite:///db.sqlite3
+      - CSRF_COOKIE_SECURE=False
+      - SESSION_COOKIE_SECURE=False
+      - SECURE_SSL_REDIRECT=False
+      - SECURE_HSTS_SECONDS=0
+      - SECURE_HSTS_INCLUDE_SUBDOMAINS=False
+      - SECURE_HSTS_PRELOAD=False
+      - MAX_UPLOAD_SIZE=10485760
+      - TIME_ZONE=UTC
+      - LANGUAGE_CODE=en-us
+      - USE_I18N=True
+      - USE_TZ=True
+    restart: always
+
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  backend_storage:
+  backend_static:
+  backend_data: 
