@@ -4,26 +4,26 @@ import { File as FileType, SearchParams } from '../types/file';
 import { DocumentIcon, TrashIcon, ArrowDownTrayIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-interface FileListProps {
-  searchParams?: SearchParams;
+interface SearchResultsProps {
+  searchParams: SearchParams;
 }
 
-export const FileList: React.FC<FileListProps> = ({ searchParams = {} }) => {
+export const SearchResults: React.FC<SearchResultsProps> = ({ searchParams }) => {
   const queryClient = useQueryClient();
   const [fileToDelete, setFileToDelete] = useState<FileType | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Query for fetching files with search params
+  // Query for search results
   const { data: files, isLoading, error } = useQuery({
-    queryKey: ['files', searchParams],
-    queryFn: () => fileService.getFiles(searchParams),
+    queryKey: ['search', searchParams],
+    queryFn: () => fileService.searchFiles(searchParams),
   });
 
   // Mutation for deleting files
   const deleteMutation = useMutation({
     mutationFn: fileService.deleteFile,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['files'] });
+      queryClient.invalidateQueries({ queryKey: ['search'] });
       setFileToDelete(null);
       setDeleteError(null);
     },
@@ -94,7 +94,7 @@ export const FileList: React.FC<FileListProps> = ({ searchParams = {} }) => {
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-red-700">Failed to load files. Please try again.</p>
+              <p className="text-sm text-red-700">Failed to load search results. Please try again.</p>
             </div>
           </div>
         </div>
@@ -104,13 +104,13 @@ export const FileList: React.FC<FileListProps> = ({ searchParams = {} }) => {
 
   return (
     <div className="p-6">
-      <h2 className="text-xl font-semibold text-gray-900 mb-4">Uploaded Files</h2>
+      <h2 className="text-xl font-semibold text-gray-900 mb-4">Search Results</h2>
       {!files || files.length === 0 ? (
         <div className="text-center py-12">
           <DocumentIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No files</h3>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No results found</h3>
           <p className="mt-1 text-sm text-gray-500">
-            Get started by uploading a file
+            Try adjusting your search criteria
           </p>
         </div>
       ) : (
