@@ -63,18 +63,21 @@ const FileUpload: React.FC<FileUploadProps> = ({
             originalFile: duplicateCheck.original_file_name,
             savedBytes: file.size
           });
+          // Show a warning but allow upload
+          setError('This file appears to be a duplicate. You can still upload it if needed.');
         } else {
           setIsDuplicate(false);
           setDuplicateInfo(null);
+          setError(null);
         }
       } catch (err) {
         console.error('Duplicate check error:', err);
         setIsDuplicate(false);
         setDuplicateInfo(null);
+        setError('Failed to check for duplicates. Please try again.');
       }
 
       setSelectedFile(file);
-      setError(null);
     }
   };
 
@@ -87,7 +90,17 @@ const FileUpload: React.FC<FileUploadProps> = ({
     setIsUploading(true);
     try {
       setError(null);
-      await uploadMutation.mutateAsync(selectedFile);
+      const uploadedFile = await uploadMutation.mutateAsync(selectedFile);
+      
+      if (uploadedFile.is_duplicate) {
+        // Show success message for duplicate upload
+        setError('File uploaded successfully as a duplicate. Storage space saved!');
+        if (onStorageSaved) {
+          onStorageSaved(uploadedFile.storage_saved);
+        }
+      } else {
+        setError('File uploaded successfully!');
+      }
     } catch (err) {
       // Error handling is done in onError callback
     } finally {
@@ -155,11 +168,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
               </button>
             </div>
             {isDuplicate && duplicateInfo && (
-              <div className="flex items-center text-sm text-yellow-600 bg-yellow-50 p-2 rounded">
-                <DocumentDuplicateIcon className="h-5 w-5 mr-2" />
+              <div className="flex items-center text-sm text-yellow-600 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                <DocumentDuplicateIcon className="h-5 w-5 mr-2 flex-shrink-0" />
                 <div>
-                  <p>This file is a duplicate of: {duplicateInfo.originalFile}</p>
-                  <p className="text-xs">Storage saved: {formatFileSize(duplicateInfo.savedBytes)}</p>
+                  <p className="font-medium">Duplicate File Detected</p>
+                  <p className="text-xs mt-1">Original file: {duplicateInfo.originalFile}</p>
+                  <p className="text-xs mt-1 text-green-600">
+                    Storage saved: {formatFileSize(duplicateInfo.savedBytes)}
+                  </p>
                 </div>
               </div>
             )}

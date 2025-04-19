@@ -1,5 +1,8 @@
 from rest_framework import serializers
 from .models import File
+import logging
+
+logger = logging.getLogger(__name__)
 
 class FileSerializer(serializers.ModelSerializer):
     original_file_name = serializers.SerializerMethodField()
@@ -14,8 +17,10 @@ class FileSerializer(serializers.ModelSerializer):
             'storage_saved', 'original_file_name', 'storage_saved_human',
             'size_human'
         ]
-        read_only_fields = ['id', 'uploaded_at', 'file_hash', 'is_duplicate', 
-                          'original_file', 'storage_saved']
+        read_only_fields = [
+            'id', 'file_type', 'uploaded_at', 'storage_saved_human',
+            'size_human'
+        ]
 
     def get_original_file_name(self, obj):
         if obj.original_file:
@@ -34,4 +39,112 @@ class FileSerializer(serializers.ModelSerializer):
             if size < 1024.0:
                 return f"{size:.2f} {unit}"
             size /= 1024.0
-        return f"{size:.2f} PB" 
+        return f"{size:.2f} PB"
+
+    def create(self, validated_data):
+        logger.info(f"Creating file with validated_data: {validated_data}")
+        # Ensure size is set
+        if 'size' not in validated_data or validated_data['size'] is None:
+            file = validated_data.get('file')
+            if file:
+                validated_data['size'] = file.size
+                logger.info(f"Set size in serializer: {validated_data['size']}")
+            else:
+                raise serializers.ValidationError("File size cannot be determined")
+        return super().create(validated_data)
+
+
+
+
+
+# from rest_framework import serializers
+# from .models import File
+
+# class FileSerializer(serializers.ModelSerializer):
+#     original_file_name = serializers.SerializerMethodField()
+#     storage_saved_human = serializers.SerializerMethodField()
+#     size_human = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = File
+#         fields = [
+#             'id', 'file', 'original_filename', 'file_type', 'size', 
+#             'uploaded_at', 'file_hash', 'is_duplicate', 'original_file',
+#             'storage_saved', 'original_file_name', 'storage_saved_human',
+#             'size_human'
+#         ]
+#         read_only_fields = [
+#             'id', 'file_type', 'uploaded_at', 'file_hash',
+#             'is_duplicate', 'storage_saved', 'storage_saved_human',
+#             'size_human', 'original_file'
+#         ]
+
+#     def get_original_file_name(self, obj):
+#         if obj.original_file:
+#             return obj.original_file.original_filename
+#         return None
+
+#     def get_storage_saved_human(self, obj):
+#         return self._humanize_size(obj.storage_saved)
+
+#     def get_size_human(self, obj):
+#         return self._humanize_size(obj.size)
+
+#     def _humanize_size(self, size):
+#         """Convert bytes to human readable format"""
+#         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+#             if size < 1024.0:
+#                 return f"{size:.2f} {unit}"
+#             size /= 1024.0
+#         return f"{size:.2f} PB"
+
+#     def create(self, validated_data):
+#         # Ensure size is included in validated data
+#         return super().create(validated_data)
+
+
+
+# from rest_framework import serializers
+# from .models import File
+
+# class FileSerializer(serializers.ModelSerializer):
+#     original_file_name = serializers.SerializerMethodField()
+#     storage_saved_human = serializers.SerializerMethodField()
+#     size_human = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = File
+#         fields = [
+#             'id', 'file', 'original_filename', 'file_type', 'size', 
+#             'uploaded_at', 'file_hash', 'is_duplicate', 'original_file',
+#             'storage_saved', 'original_file_name', 'storage_saved_human',
+#             'size_human'
+#         ]
+#         read_only_fields = [
+#             'id', 'file_type', 'size', 'uploaded_at', 'file_hash',
+#             'is_duplicate', 'storage_saved', 'storage_saved_human',
+#             'size_human'
+#         ]
+
+#     def get_original_file_name(self, obj):
+#         if obj.original_file:
+#             return obj.original_file.original_filename
+#         return None
+
+#     def get_storage_saved_human(self, obj):
+#         return self._humanize_size(obj.storage_saved)
+
+#     def get_size_human(self, obj):
+#         return self._humanize_size(obj.size)
+
+#     def _humanize_size(self, size):
+#         """Convert bytes to human readable format"""
+#         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+#             if size < 1024.0:
+#                 return f"{size:.2f} {unit}"
+#             size /= 1024.0
+#         return f"{size:.2f} PB"
+
+#     def create(self, validated_data):
+#         # The file_hash is already calculated in the view
+#         return super().create(validated_data) 
