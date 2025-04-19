@@ -1,13 +1,37 @@
 import axios from 'axios';
-import { File as FileType } from '../types/file';
+import { File, StorageStats, SearchParams } from '../types/file';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
+interface DuplicateCheckResponse {
+  is_duplicate: boolean;
+  original_file_name?: string;
+  original_file_id?: string;
+}
+
 export const fileService = {
-  async uploadFile(file: File): Promise<FileType> {
+  // Get all files with optional filters
+  getFiles: async (params?: SearchParams): Promise<File[]> => {
+    const response = await axios.get(`${API_URL}/files/`, { params });
+    return response.data;
+  },
+
+  // Check if a file is a duplicate
+  checkDuplicate: async (file: Blob): Promise<DuplicateCheckResponse> => {
     const formData = new FormData();
     formData.append('file', file);
+    const response = await axios.post(`${API_URL}/files/check_duplicate/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 
+  // Upload a file
+  uploadFile: async (file: Blob): Promise<File> => {
+    const formData = new FormData();
+    formData.append('file', file);
     const response = await axios.post(`${API_URL}/files/`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -16,13 +40,21 @@ export const fileService = {
     return response.data;
   },
 
-  async getFiles(): Promise<FileType[]> {
-    const response = await axios.get(`${API_URL}/files/`);
+  // Delete a file
+  deleteFile: async (id: string): Promise<void> => {
+    await axios.delete(`${API_URL}/files/${id}/`);
+  },
+
+  // Search files with advanced filters
+  searchFiles: async (params: SearchParams): Promise<File[]> => {
+    const response = await axios.get(`${API_URL}/files/search/`, { params });
     return response.data;
   },
 
-  async deleteFile(id: string): Promise<void> {
-    await axios.delete(`${API_URL}/files/${id}/`);
+  // Get storage statistics
+  getStorageStats: async (): Promise<StorageStats> => {
+    const response = await axios.get(`${API_URL}/files/storage_stats/`);
+    return response.data;
   },
 
   async downloadFile(fileUrl: string, filename: string): Promise<void> {

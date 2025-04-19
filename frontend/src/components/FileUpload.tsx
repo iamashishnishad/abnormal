@@ -1,39 +1,78 @@
 import React, { useState } from 'react';
 import { fileService } from '../services/fileService';
-import { CloudArrowUpIcon } from '@heroicons/react/24/outline';
+import { CloudArrowUpIcon, DocumentDuplicateIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { File as FileType } from '../types/file';
 
 interface FileUploadProps {
-  onUploadSuccess: () => void;
+  onUploadSuccess: (file: FileType) => void;
+  onUploadError: (error: string) => void;
+  maxFileSize?: number; // in bytes
+  onStorageSaved?: (savedBytes: number) => void;
 }
 
-export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
+const FileUpload: React.FC<FileUploadProps> = ({ 
+  onUploadSuccess, 
+  onUploadError,
+  maxFileSize = 10 * 1024 * 1024, // Default 10MB
+  onStorageSaved
+}) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isDuplicate, setIsDuplicate] = useState(false);
+  const [duplicateInfo, setDuplicateInfo] = useState<{ originalFile: string; savedBytes: number } | null>(null);
   const queryClient = useQueryClient();
+  const [isUploading, setIsUploading] = useState(false);
 
   const uploadMutation = useMutation<FileType, Error, File>({
     mutationFn: fileService.uploadFile,
-    onSuccess: () => {
+    onSuccess: (file) => {
       queryClient.invalidateQueries({ queryKey: ['files'] });
       setSelectedFile(null);
       setError(null);
-      onUploadSuccess();
+      setIsDuplicate(false);
+      setDuplicateInfo(null);
+      if (file.is_duplicate && onStorageSaved) {
+        onStorageSaved(file.size);
+      }
+      onUploadSuccess(file);
     },
     onError: (error: Error) => {
-      setError(error.message || 'Failed to upload file. Please try again.');
+      const errorMessage = error.message || 'Failed to upload file. Please try again.';
+      setError(errorMessage);
       console.error('Upload error:', error);
+      onUploadError(errorMessage);
     },
   });
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
-        setError('File size exceeds 10MB limit');
+      if (file.size > maxFileSize) {
+        const sizeInMB = (maxFileSize / (1024 * 1024)).toFixed(0);
+        setError(`File size exceeds ${sizeInMB}MB limit`);
         return;
       }
+
+      // Check for duplicates before uploading
+      try {
+        const duplicateCheck = await fileService.checkDuplicate(file);
+        if (duplicateCheck.is_duplicate && duplicateCheck.original_file_name) {
+          setIsDuplicate(true);
+          setDuplicateInfo({
+            originalFile: duplicateCheck.original_file_name,
+            savedBytes: file.size
+          });
+        } else {
+          setIsDuplicate(false);
+          setDuplicateInfo(null);
+        }
+      } catch (err) {
+        console.error('Duplicate check error:', err);
+        setIsDuplicate(false);
+        setDuplicateInfo(null);
+      }
+
       setSelectedFile(file);
       setError(null);
     }
@@ -45,12 +84,23 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
       return;
     }
 
+    setIsUploading(true);
     try {
       setError(null);
       await uploadMutation.mutateAsync(selectedFile);
     } catch (err) {
       // Error handling is done in onError callback
+    } finally {
+      setIsUploading(false);
     }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   return (
@@ -74,17 +124,45 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
                   type="file"
                   className="sr-only"
                   onChange={handleFileSelect}
-                  disabled={uploadMutation.isPending}
+                  disabled={isUploading}
                 />
               </label>
               <p className="pl-1">or drag and drop</p>
             </div>
-            <p className="text-xs text-gray-500">Any file up to 10MB</p>
+            <p className="text-xs text-gray-500">
+              Any file up to {formatFileSize(maxFileSize)}
+            </p>
           </div>
         </div>
         {selectedFile && (
-          <div className="text-sm text-gray-600">
-            Selected: {selectedFile.name}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+              <div className="flex-1">
+                <p className="font-medium">{selectedFile.name}</p>
+                <p className="text-xs text-gray-500">{formatFileSize(selectedFile.size)}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedFile(null);
+                  setIsDuplicate(false);
+                  setDuplicateInfo(null);
+                  setError(null);
+                }}
+                className="p-1 text-gray-400 hover:text-gray-600 focus:outline-none"
+                title="Remove file"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            {isDuplicate && duplicateInfo && (
+              <div className="flex items-center text-sm text-yellow-600 bg-yellow-50 p-2 rounded">
+                <DocumentDuplicateIcon className="h-5 w-5 mr-2" />
+                <div>
+                  <p>This file is a duplicate of: {duplicateInfo.originalFile}</p>
+                  <p className="text-xs">Storage saved: {formatFileSize(duplicateInfo.savedBytes)}</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {error && (
@@ -94,14 +172,14 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         )}
         <button
           onClick={handleUpload}
-          disabled={!selectedFile || uploadMutation.isPending}
+          disabled={!selectedFile || isUploading}
           className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-            !selectedFile || uploadMutation.isPending
+            !selectedFile || isUploading
               ? 'bg-gray-300 cursor-not-allowed'
               : 'bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500'
           }`}
         >
-          {uploadMutation.isPending ? (
+          {isUploading ? (
             <>
               <svg
                 className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
@@ -132,4 +210,6 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
       </div>
     </div>
   );
-}; 
+};
+
+export default FileUpload; 
