@@ -43,7 +43,7 @@ docker-compose up --build
 1. **Create and activate virtual environment**
    ```bash
    cd backend
-   python3 -m venv venv
+   python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
