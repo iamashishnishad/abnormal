@@ -24,7 +24,7 @@ Django-based backend for the File Hub application, providing a robust API for fi
 
 1. **Create and activate virtual environment**
    ```bash
-   python -m venv venv
+   python3 -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
